@@ -821,12 +821,12 @@
     const col = index % cols;
     const row = Math.floor(index / cols);
     const crop = {
-      x: col * cellW + cellW * 0.18,
-      y: row * cellH + cellH * 0.05,
-      w: cellW * 0.64,
-      h: cellH * 0.9,
+      x: col * cellW + cellW * 0.23,
+      y: row * cellH + cellH * 0.07,
+      w: cellW * 0.54,
+      h: cellH * 0.86,
     };
-    const scale = player ? 1.08 : 1.04;
+    const scale = player ? 1.22 : 1.18;
     const drawW = w * scale;
     const drawH = h * scale;
 
