@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2D 주차장</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="game-stage" aria-label="2D 주차장 게임">
+        <canvas id="game" width="1280" height="760"></canvas>
+
+        <header class="hud">
+          <div class="title">
+            <span class="mark"></span>
+            <strong>2D 주차장</strong>
+          </div>
+          <div class="stats">
+            <span><small>레벨</small><b id="levelText">1</b></span>
+            <span><small>시간</small><b id="timeText">0.0</b></span>
+            <span><small>접촉</small><b id="hitText">0</b></span>
+          </div>
+          <div class="actions">
+            <button id="pauseButton" class="icon-button" type="button" aria-label="일시정지">⏸</button>
+            <button id="resetButton" class="icon-button" type="button" aria-label="다시 시작">↻</button>
+            <button id="editButton" class="icon-button" type="button" aria-label="편집 모드">✎</button>
+          </div>
+        </header>
+
+        <div id="banner" class="banner is-hidden" role="status" aria-live="polite">
+          <strong id="bannerTitle">클리어</strong>
+          <span id="bannerMeta">다음 레벨</span>
+        </div>
+
+        <aside id="editorPanel" class="editor-panel is-hidden" aria-label="배치 편집기">
+          <div class="editor-row">
+            <select id="editorLevelSelect" aria-label="편집할 레벨"></select>
+            <button id="saveLayoutButton" type="button">저장</button>
+            <button id="resetLayoutButton" type="button">기본값</button>
+          </div>
+          <div class="editor-row">
+            <button id="addParkedButton" type="button">차+</button>
+            <button id="addConeButton" type="button">콘+</button>
+            <button id="addCurbButton" type="button">연석+</button>
+            <button id="deleteItemButton" type="button">삭제</button>
+          </div>
+          <div class="editor-row">
+            <button id="rotateLeftButton" type="button">↺</button>
+            <button id="rotateRightButton" type="button">↻</button>
+            <span id="editorStatus">선택 없음</span>
+          </div>
+        </aside>
+
+        <nav class="touch-pad" aria-label="터치 조작">
+          <button type="button" data-control="up" aria-label="앞으로">▲</button>
+          <button type="button" data-control="left" aria-label="왼쪽">◀</button>
+          <button type="button" data-control="brake" aria-label="브레이크">■</button>
+          <button type="button" data-control="right" aria-label="오른쪽">▶</button>
+          <button type="button" data-control="down" aria-label="뒤로">▼</button>
+        </nav>
+      </section>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
