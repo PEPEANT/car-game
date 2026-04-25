@@ -39,7 +39,79 @@
     a: 0.05 + rand() * 0.08,
   }));
 
-  const palette = ["#4f9df2", "#f06666", "#47be8b", "#f0b64f", "#a389f4", "#d9dde0"];
+  const carDesigns = [
+    {
+      id: "seoul-sedan",
+      body: "#2e8bd7",
+      roof: "#111b22",
+      glass: "#13242c",
+      trim: "#d8eef7",
+      accent: "#86c8ff",
+      plate: "#f7f2d3",
+      type: "sedan",
+    },
+    {
+      id: "taxi-yellow",
+      body: "#f3c348",
+      roof: "#10181c",
+      glass: "#162932",
+      trim: "#fff1a6",
+      accent: "#1d8f64",
+      plate: "#f7f2d3",
+      type: "taxi",
+    },
+    {
+      id: "city-suv",
+      body: "#40b985",
+      roof: "#123127",
+      glass: "#153329",
+      trim: "#c9f3df",
+      accent: "#f05d52",
+      plate: "#f7f2d3",
+      type: "suv",
+    },
+    {
+      id: "ev-white",
+      body: "#eef3f1",
+      roof: "#566066",
+      glass: "#1d2b31",
+      trim: "#ffffff",
+      accent: "#5ab0ff",
+      plate: "#d7f0ff",
+      type: "ev",
+    },
+    {
+      id: "red-fastback",
+      body: "#ef5b61",
+      roof: "#28171a",
+      glass: "#231a1f",
+      trim: "#ffd0d0",
+      accent: "#ff777e",
+      plate: "#f7f2d3",
+      type: "fastback",
+    },
+    {
+      id: "silver-van",
+      body: "#cfd7d8",
+      roof: "#687174",
+      glass: "#253238",
+      trim: "#f6fbfb",
+      accent: "#ff6c6c",
+      plate: "#f7f2d3",
+      type: "van",
+    },
+    {
+      id: "midnight-sedan",
+      body: "#2f3a46",
+      roof: "#0f151b",
+      glass: "#18222b",
+      trim: "#cad2d8",
+      accent: "#ffd65a",
+      plate: "#f7f2d3",
+      type: "sedan",
+    },
+  ];
+  const palette = carDesigns.map((design) => design.body);
 
   const defaultLevels = buildLevels();
   const levels = loadSavedLevels(defaultLevels);
@@ -210,6 +282,7 @@
       angle: slot.angle,
       type: "parked",
       color: palette[(index + offset) % palette.length],
+      design: carDesigns[(index + offset) % carDesigns.length].id,
     }));
   }
 
@@ -634,25 +707,13 @@
     ctx.save();
     ctx.translate(obstacle.x, obstacle.y);
     ctx.rotate(obstacle.angle);
-
-    drawShadow(obstacle.w, obstacle.h, 0.32);
-    ctx.fillStyle = obstacle.color;
-    roundRectPath(ctx, -obstacle.w / 2, -obstacle.h / 2, obstacle.w, obstacle.h, 12);
-    ctx.fill();
-
-    ctx.fillStyle = "rgba(9, 16, 20, 0.46)";
-    roundRectPath(ctx, -obstacle.w / 2 + 11, -obstacle.h / 2 + 18, obstacle.w - 22, 28, 7);
-    ctx.fill();
-    roundRectPath(ctx, -obstacle.w / 2 + 12, 4, obstacle.w - 24, 34, 7);
-    ctx.fill();
-
-    ctx.fillStyle = "rgba(255, 255, 255, 0.66)";
-    ctx.fillRect(-obstacle.w / 2 + 8, -obstacle.h / 2 + 5, 12, 5);
-    ctx.fillRect(obstacle.w / 2 - 20, -obstacle.h / 2 + 5, 12, 5);
-    ctx.fillStyle = "rgba(255, 80, 80, 0.7)";
-    ctx.fillRect(-obstacle.w / 2 + 8, obstacle.h / 2 - 10, 12, 5);
-    ctx.fillRect(obstacle.w / 2 - 20, obstacle.h / 2 - 10, 12, 5);
-
+    drawVehicleSprite({
+      w: obstacle.w,
+      h: obstacle.h,
+      design: obstacle.design,
+      color: obstacle.color,
+      parked: true,
+    });
     ctx.restore();
   }
 
@@ -696,40 +757,251 @@
     ctx.restore();
   }
 
+  function drawVehicleSprite({ w, h, design, color, player = false, damaged = false }) {
+    const spec = resolveCarDesign(design, color);
+    const bodyColor = damaged ? "#ff6b57" : color || spec.body;
+    const type = spec.type;
+
+    drawShadow(w, h, player ? 0.42 : 0.34);
+    drawVehicleTires(w, h);
+
+    ctx.save();
+    drawVehicleBodyPath(w, h, type);
+    ctx.fillStyle = bodyColor;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+    ctx.stroke();
+    ctx.clip();
+
+    drawVehiclePaintDetails(w, h, spec, bodyColor, player);
+    drawVehicleGlass(w, h, spec);
+    drawVehicleLights(w, h, spec, player);
+    ctx.restore();
+
+    if (type === "taxi" || player) drawTaxiSign(w, h);
+    if (type === "suv") drawRoofRails(w, h);
+    if (type === "ev") drawEvBadge(w, h);
+  }
+
+  function resolveCarDesign(id, color) {
+    const byId = carDesigns.find((design) => design.id === id);
+    const byColor = carDesigns.find((design) => design.body === color);
+    return byId || byColor || carDesigns[0];
+  }
+
+  function drawVehicleBodyPath(w, h, type) {
+    const hw = w / 2;
+    const hh = h / 2;
+    const front = type === "van" ? 0.78 : type === "fastback" ? 0.58 : 0.66;
+    const shoulder = type === "suv" || type === "van" ? 0.96 : 0.9;
+    const rear = type === "fastback" ? 0.72 : 0.84;
+    const nose = type === "van" ? 7 : 10;
+    const tail = type === "fastback" ? 9 : 7;
+
+    ctx.beginPath();
+    ctx.moveTo(-hw * front, -hh + nose);
+    ctx.quadraticCurveTo(-hw * shoulder, -hh + 16, -hw * shoulder, -hh + 34);
+    ctx.lineTo(-hw * rear, hh - 18);
+    ctx.quadraticCurveTo(-hw * rear, hh - tail, -hw * 0.5, hh - tail);
+    ctx.lineTo(hw * 0.5, hh - tail);
+    ctx.quadraticCurveTo(hw * rear, hh - tail, hw * rear, hh - 18);
+    ctx.lineTo(hw * shoulder, -hh + 34);
+    ctx.quadraticCurveTo(hw * shoulder, -hh + 16, hw * front, -hh + nose);
+    ctx.quadraticCurveTo(0, -hh, -hw * front, -hh + nose);
+    ctx.closePath();
+  }
+
+  function drawVehicleTires(w, h) {
+    const hw = w / 2;
+    const hh = h / 2;
+    const tireW = Math.max(6, w * 0.13);
+    const tireH = Math.max(18, h * 0.23);
+    const tireX = hw - tireW * 0.44;
+    const frontY = -hh + h * 0.27;
+    const rearY = hh - h * 0.31;
+
+    ctx.fillStyle = "#20292a";
+    roundRectPath(ctx, -tireX - tireW / 2, frontY - tireH / 2, tireW, tireH, 4);
+    ctx.fill();
+    roundRectPath(ctx, tireX - tireW / 2, frontY - tireH / 2, tireW, tireH, 4);
+    ctx.fill();
+    roundRectPath(ctx, -tireX - tireW / 2, rearY - tireH / 2, tireW, tireH, 4);
+    ctx.fill();
+    roundRectPath(ctx, tireX - tireW / 2, rearY - tireH / 2, tireW, tireH, 4);
+    ctx.fill();
+  }
+
+  function drawVehiclePaintDetails(w, h, spec, bodyColor, player) {
+    const hw = w / 2;
+    const hh = h / 2;
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
+    roundRectPath(ctx, -hw * 0.48, -hh + 10, w * 0.96, 7, 4);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+    roundRectPath(ctx, -hw * 0.42, hh - 17, w * 0.84, 8, 4);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.23)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-hw * 0.56, -hh + 34);
+    ctx.lineTo(-hw * 0.48, hh - 22);
+    ctx.moveTo(hw * 0.56, -hh + 34);
+    ctx.lineTo(hw * 0.48, hh - 22);
+    ctx.stroke();
+
+    if (spec.type === "taxi" || player) {
+      ctx.fillStyle = spec.accent;
+      roundRectPath(ctx, -hw + 7, -hh + 40, 5, h - 70, 3);
+      ctx.fill();
+      roundRectPath(ctx, hw - 12, -hh + 40, 5, h - 70, 3);
+      ctx.fill();
+    }
+
+    if (spec.type === "ev") {
+      ctx.strokeStyle = spec.accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-hw * 0.42, -hh + 23);
+      ctx.quadraticCurveTo(0, -hh + 13, hw * 0.42, -hh + 23);
+      ctx.stroke();
+    }
+
+    if (spec.type === "van") {
+      ctx.fillStyle = shadeColor(bodyColor, -18);
+      roundRectPath(ctx, -hw * 0.5, h * 0.05, w, h * 0.26, 7);
+      ctx.fill();
+    }
+  }
+
+  function drawVehicleGlass(w, h, spec) {
+    const hw = w / 2;
+    const hh = h / 2;
+    const glass = spec.glass;
+
+    if (spec.type === "ev") {
+      ctx.fillStyle = glass;
+      roundRectPath(ctx, -hw * 0.45, -hh + 18, w * 0.9, h - 42, 11);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+      roundRectPath(ctx, -hw * 0.32, -hh + 25, w * 0.26, h - 56, 6);
+      ctx.fill();
+      return;
+    }
+
+    const frontH = spec.type === "van" ? h * 0.18 : h * 0.22;
+    const cabinH = spec.type === "fastback" ? h * 0.36 : h * 0.29;
+    const rearH = spec.type === "suv" || spec.type === "van" ? h * 0.24 : h * 0.18;
+
+    ctx.fillStyle = glass;
+    roundRectPath(ctx, -hw * 0.58, -hh + 18, w * 0.58, frontH, 7);
+    ctx.fill();
+    roundRectPath(ctx, hw * 0.02, -hh + 18, w * 0.56, frontH, 7);
+    ctx.fill();
+
+    ctx.fillStyle = shadeColor(glass, 12);
+    roundRectPath(ctx, -hw * 0.58, -h * 0.04, w * 1.16, cabinH, 9);
+    ctx.fill();
+
+    ctx.fillStyle = glass;
+    roundRectPath(ctx, -hw * 0.5, hh - rearH - 13, w, rearH, 7);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+    roundRectPath(ctx, -hw * 0.44, -hh + 24, w * 0.34, 5, 3);
+    ctx.fill();
+  }
+
+  function drawVehicleLights(w, h, spec, player) {
+    const hw = w / 2;
+    const hh = h / 2;
+    const frontLight = player ? "#fff4a8" : "rgba(255, 255, 225, 0.88)";
+
+    ctx.fillStyle = frontLight;
+    roundRectPath(ctx, -hw * 0.62, -hh + 5, w * 0.25, 5, 3);
+    ctx.fill();
+    roundRectPath(ctx, hw * 0.37, -hh + 5, w * 0.25, 5, 3);
+    ctx.fill();
+
+    ctx.fillStyle = spec.accent || "#e34d54";
+    roundRectPath(ctx, -hw * 0.6, hh - 11, w * 0.22, 6, 3);
+    ctx.fill();
+    roundRectPath(ctx, hw * 0.38, hh - 11, w * 0.22, 6, 3);
+    ctx.fill();
+
+    ctx.fillStyle = spec.plate;
+    roundRectPath(ctx, -hw * 0.22, hh - 13, w * 0.44, 7, 3);
+    ctx.fill();
+  }
+
+  function drawTaxiSign(w, h) {
+    const hw = w / 2;
+    ctx.save();
+    ctx.fillStyle = "#f7f2d3";
+    roundRectPath(ctx, -hw * 0.34, -h * 0.04, w * 0.68, 12, 5);
+    ctx.fill();
+    ctx.fillStyle = "#11181c";
+    roundRectPath(ctx, -hw * 0.18, -h * 0.015, w * 0.36, 4, 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRoofRails(w, h) {
+    const hw = w / 2;
+    const hh = h / 2;
+    ctx.save();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.34)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-hw * 0.48, -hh + 24);
+    ctx.lineTo(-hw * 0.48, hh - 24);
+    ctx.moveTo(hw * 0.48, -hh + 24);
+    ctx.lineTo(hw * 0.48, hh - 24);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawEvBadge(w, h) {
+    const hw = w / 2;
+    const hh = h / 2;
+    ctx.save();
+    ctx.fillStyle = "#5ab0ff";
+    ctx.beginPath();
+    ctx.arc(hw * 0.42, hh - 23, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function shadeColor(hex, percent) {
+    const value = hex.replace("#", "");
+    if (value.length !== 6) return hex;
+    const amount = Math.round(2.55 * percent);
+    const r = clamp(parseInt(value.slice(0, 2), 16) + amount, 0, 255);
+    const g = clamp(parseInt(value.slice(2, 4), 16) + amount, 0, 255);
+    const b = clamp(parseInt(value.slice(4, 6), 16) + amount, 0, 255);
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  function toHex(value) {
+    return Math.round(value).toString(16).padStart(2, "0");
+  }
+
   function drawPlayer() {
     ctx.save();
     ctx.translate(car.x, car.y);
     ctx.rotate(car.angle);
 
-    drawShadow(PLAYER.w, PLAYER.h, 0.38);
-    const bodyColor = car.flash > 0 ? "#ff6b57" : "#ffd65a";
-    ctx.fillStyle = bodyColor;
-    roundRectPath(ctx, -PLAYER.w / 2, -PLAYER.h / 2, PLAYER.w, PLAYER.h, 13);
-    ctx.fill();
-
-    ctx.fillStyle = "#11191d";
-    roundRectPath(ctx, -PLAYER.w / 2 + 9, -PLAYER.h / 2 + 17, PLAYER.w - 18, 28, 8);
-    ctx.fill();
-    roundRectPath(ctx, -PLAYER.w / 2 + 10, 4, PLAYER.w - 20, 31, 8);
-    ctx.fill();
-
-    ctx.fillStyle = "#2f3534";
-    roundRectPath(ctx, -PLAYER.w / 2 - 5, -PLAYER.h / 2 + 18, 7, 24, 3);
-    ctx.fill();
-    roundRectPath(ctx, PLAYER.w / 2 - 2, -PLAYER.h / 2 + 18, 7, 24, 3);
-    ctx.fill();
-    roundRectPath(ctx, -PLAYER.w / 2 - 5, PLAYER.h / 2 - 38, 7, 24, 3);
-    ctx.fill();
-    roundRectPath(ctx, PLAYER.w / 2 - 2, PLAYER.h / 2 - 38, 7, 24, 3);
-    ctx.fill();
-
-    ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
-    ctx.fillRect(-PLAYER.w / 2 + 7, -PLAYER.h / 2 + 5, 12, 5);
-    ctx.fillRect(PLAYER.w / 2 - 19, -PLAYER.h / 2 + 5, 12, 5);
-    ctx.fillStyle = "#d64242";
-    ctx.fillRect(-PLAYER.w / 2 + 8, PLAYER.h / 2 - 10, 11, 5);
-    ctx.fillRect(PLAYER.w / 2 - 19, PLAYER.h / 2 - 10, 11, 5);
-
+    drawVehicleSprite({
+      w: PLAYER.w,
+      h: PLAYER.h,
+      design: "taxi-yellow",
+      color: car.flash > 0 ? "#ff6b57" : "#ffd65a",
+      player: true,
+      damaged: car.flash > 0,
+    });
     ctx.restore();
   }
 
@@ -985,6 +1257,7 @@
         angle: base.angle || 0,
         type: "parked",
         color: palette[level.obstacles.length % palette.length],
+        design: carDesigns[level.obstacles.length % carDesigns.length].id,
       };
     }
     if (type === "cone") {
