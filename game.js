@@ -49,6 +49,7 @@
       accent: "#86c8ff",
       plate: "#f7f2d3",
       type: "sedan",
+      spriteIndex: 0,
     },
     {
       id: "taxi-yellow",
@@ -59,6 +60,7 @@
       accent: "#1d8f64",
       plate: "#f7f2d3",
       type: "taxi",
+      spriteIndex: 1,
     },
     {
       id: "city-suv",
@@ -69,6 +71,7 @@
       accent: "#f05d52",
       plate: "#f7f2d3",
       type: "suv",
+      spriteIndex: 3,
     },
     {
       id: "ev-white",
@@ -79,6 +82,7 @@
       accent: "#5ab0ff",
       plate: "#d7f0ff",
       type: "ev",
+      spriteIndex: 2,
     },
     {
       id: "red-fastback",
@@ -89,6 +93,7 @@
       accent: "#ff777e",
       plate: "#f7f2d3",
       type: "fastback",
+      spriteIndex: 6,
     },
     {
       id: "silver-van",
@@ -99,6 +104,7 @@
       accent: "#ff6c6c",
       plate: "#f7f2d3",
       type: "van",
+      spriteIndex: 4,
     },
     {
       id: "midnight-sedan",
@@ -109,9 +115,27 @@
       accent: "#ffd65a",
       plate: "#f7f2d3",
       type: "sedan",
+      spriteIndex: 5,
+    },
+    {
+      id: "blue-hatchback",
+      body: "#238bd9",
+      roof: "#111b22",
+      glass: "#13242c",
+      trim: "#d8eef7",
+      accent: "#86c8ff",
+      plate: "#f7f2d3",
+      type: "hatchback",
+      spriteIndex: 7,
     },
   ];
   const palette = carDesigns.map((design) => design.body);
+  const carSpriteSheet = new Image();
+  let carSpriteSheetReady = false;
+  carSpriteSheet.onload = () => {
+    carSpriteSheetReady = true;
+  };
+  carSpriteSheet.src = "assets/cars/topview-korean-cars-transparent.png";
 
   const defaultLevels = buildLevels();
   const levels = loadSavedLevels(defaultLevels);
@@ -762,6 +786,11 @@
     const bodyColor = damaged ? "#ff6b57" : color || spec.body;
     const type = spec.type;
 
+    if (carSpriteSheetReady) {
+      drawVehiclePngSprite(w, h, spec, player, damaged);
+      return;
+    }
+
     drawShadow(w, h, player ? 0.42 : 0.34);
     drawVehicleTires(w, h);
 
@@ -782,6 +811,44 @@
     if (type === "taxi" || player) drawTaxiSign(w, h);
     if (type === "suv") drawRoofRails(w, h);
     if (type === "ev") drawEvBadge(w, h);
+  }
+
+  function drawVehiclePngSprite(w, h, spec, player, damaged) {
+    const cols = 4;
+    const cellW = carSpriteSheet.naturalWidth / cols;
+    const cellH = carSpriteSheet.naturalHeight / 2;
+    const index = spec.spriteIndex ?? 0;
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    const crop = {
+      x: col * cellW + cellW * 0.18,
+      y: row * cellH + cellH * 0.05,
+      w: cellW * 0.64,
+      h: cellH * 0.9,
+    };
+    const scale = player ? 1.08 : 1.04;
+    const drawW = w * scale;
+    const drawH = h * scale;
+
+    ctx.save();
+    ctx.drawImage(
+      carSpriteSheet,
+      crop.x,
+      crop.y,
+      crop.w,
+      crop.h,
+      -drawW / 2,
+      -drawH / 2,
+      drawW,
+      drawH,
+    );
+
+    if (damaged) {
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.fillStyle = "rgba(255, 85, 64, 0.34)";
+      ctx.fillRect(-drawW / 2, -drawH / 2, drawW, drawH);
+    }
+    ctx.restore();
   }
 
   function resolveCarDesign(id, color) {

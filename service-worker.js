@@ -1,9 +1,10 @@
-const CACHE_NAME = "car-game-v3";
+const CACHE_NAME = "car-game-v4";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./game.js",
+  "./assets/cars/topview-korean-cars-transparent.png",
   "./favicon.svg",
   "./manifest.webmanifest",
 ];
