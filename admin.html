@@ -3,21 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>2D 주차장</title>
+    <title>2D 주차장 관리자</title>
     <meta name="theme-color" content="#171d1e" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body data-mode="play">
+  <body data-mode="admin">
     <main class="game-shell">
-      <section class="game-stage" aria-label="2D 주차장 게임">
+      <section class="game-stage" aria-label="2D 주차장 관리자">
         <canvas id="game" width="1280" height="760"></canvas>
 
         <header class="hud">
           <div class="title">
             <span class="mark"></span>
-            <strong>2D 주차장</strong>
+            <strong>맵 편집</strong>
           </div>
           <div class="stats">
             <span><small>레벨</small><b id="levelText">1</b></span>
@@ -27,13 +27,49 @@
           <div class="actions">
             <button id="pauseButton" class="icon-button" type="button" aria-label="일시정지">⏸</button>
             <button id="resetButton" class="icon-button" type="button" aria-label="다시 시작">↻</button>
+            <button id="editButton" class="icon-button" type="button" aria-label="편집 모드">✎</button>
+            <button
+              id="panelToggleButton"
+              class="icon-button is-active"
+              type="button"
+              aria-label="관리자 패널 열기 닫기"
+              aria-expanded="true"
+            >▤</button>
           </div>
         </header>
 
         <div id="banner" class="banner is-hidden" role="status" aria-live="polite">
-          <strong id="bannerTitle">클리어</strong>
-          <span id="bannerMeta">다음 레벨</span>
+          <strong id="bannerTitle">저장됨</strong>
+          <span id="bannerMeta">브라우저 임시저장</span>
         </div>
+
+        <aside id="editorPanel" class="editor-panel" aria-label="배치 편집기">
+          <div class="editor-row">
+            <select id="editorLevelSelect" aria-label="편집할 레벨"></select>
+            <button id="saveLayoutButton" type="button">임시저장</button>
+            <button id="exportLayoutButton" type="button">JSON 내보내기</button>
+            <button id="resetLayoutButton" type="button">기본값</button>
+          </div>
+          <div class="editor-row">
+            <button id="addParkedButton" type="button">차량+</button>
+            <button id="addConeButton" type="button">콘+</button>
+            <button id="addCurbButton" type="button">연석+</button>
+            <button id="deleteItemButton" type="button">삭제</button>
+          </div>
+          <div class="editor-row">
+            <button id="rotateLeftButton" type="button">↺</button>
+            <button id="rotateRightButton" type="button">↻</button>
+            <span id="editorStatus">선택 없음</span>
+          </div>
+          <textarea
+            id="layoutExport"
+            class="layout-export"
+            readonly
+            spellcheck="false"
+            aria-label="levels.json 내보내기 결과"
+            placeholder="JSON 내보내기를 누르면 data/levels.json에 넣을 내용이 여기에 표시됩니다."
+          ></textarea>
+        </aside>
 
         <nav class="touch-pad" aria-label="터치 조작">
           <button type="button" data-control="up" aria-label="앞으로">▲</button>

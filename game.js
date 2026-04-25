@@ -1,4 +1,4 @@
-(() => {
+(async () => {
   const canvas = document.querySelector("#game");
   const ctx = canvas.getContext("2d");
   const levelText = document.querySelector("#levelText");
@@ -20,14 +20,33 @@
   const deleteItemButton = document.querySelector("#deleteItemButton");
   const rotateLeftButton = document.querySelector("#rotateLeftButton");
   const rotateRightButton = document.querySelector("#rotateRightButton");
+  const exportLayoutButton = document.querySelector("#exportLayoutButton");
+  const layoutExport = document.querySelector("#layoutExport");
+  const panelToggleButton = document.querySelector("#panelToggleButton");
   const editorStatus = document.querySelector("#editorStatus");
 
   const WORLD = { w: 1280, h: 760 };
   const LOT = { x: 46, y: 72, w: 1188, h: 636 };
   const PLAYER = { w: 54, h: 96 };
   const HOLD_TO_WIN = 1.15;
-  const STORAGE_KEY = "parking-lot-layouts-v1";
+  const STORAGE_KEY = "parking-lot-layouts-draft-v1";
+  const LEVELS_URL = "data/levels.json";
   const SNAP = 4;
+  const isAdmin = document.body.dataset.mode === "admin";
+  const hasEditor = Boolean(
+    isAdmin &&
+      editButton &&
+      editorPanel &&
+      editorLevelSelect &&
+      saveLayoutButton &&
+      resetLayoutButton &&
+      addParkedButton &&
+      addConeButton &&
+      addCurbButton &&
+      deleteItemButton &&
+      rotateLeftButton &&
+      rotateRightButton,
+  );
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -39,106 +58,33 @@
     a: 0.05 + rand() * 0.08,
   }));
 
-  const carDesigns = [
-    {
-      id: "seoul-sedan",
-      body: "#2e8bd7",
-      roof: "#111b22",
-      glass: "#13242c",
-      trim: "#d8eef7",
-      accent: "#86c8ff",
-      plate: "#f7f2d3",
-      type: "sedan",
-      spriteIndex: 0,
-    },
-    {
-      id: "taxi-yellow",
-      body: "#f3c348",
-      roof: "#10181c",
-      glass: "#162932",
-      trim: "#fff1a6",
-      accent: "#1d8f64",
-      plate: "#f7f2d3",
-      type: "taxi",
-      spriteIndex: 1,
-    },
-    {
-      id: "city-suv",
-      body: "#40b985",
-      roof: "#123127",
-      glass: "#153329",
-      trim: "#c9f3df",
-      accent: "#f05d52",
-      plate: "#f7f2d3",
-      type: "suv",
-      spriteIndex: 3,
-    },
-    {
-      id: "ev-white",
-      body: "#eef3f1",
-      roof: "#566066",
-      glass: "#1d2b31",
-      trim: "#ffffff",
-      accent: "#5ab0ff",
-      plate: "#d7f0ff",
-      type: "ev",
-      spriteIndex: 2,
-    },
-    {
-      id: "red-fastback",
-      body: "#ef5b61",
-      roof: "#28171a",
-      glass: "#231a1f",
-      trim: "#ffd0d0",
-      accent: "#ff777e",
-      plate: "#f7f2d3",
-      type: "fastback",
-      spriteIndex: 6,
-    },
-    {
-      id: "silver-van",
-      body: "#cfd7d8",
-      roof: "#687174",
-      glass: "#253238",
-      trim: "#f6fbfb",
-      accent: "#ff6c6c",
-      plate: "#f7f2d3",
-      type: "van",
-      spriteIndex: 4,
-    },
-    {
-      id: "midnight-sedan",
-      body: "#2f3a46",
-      roof: "#0f151b",
-      glass: "#18222b",
-      trim: "#cad2d8",
-      accent: "#ffd65a",
-      plate: "#f7f2d3",
-      type: "sedan",
-      spriteIndex: 5,
-    },
-    {
-      id: "blue-hatchback",
-      body: "#238bd9",
-      roof: "#111b22",
-      glass: "#13242c",
-      trim: "#d8eef7",
-      accent: "#86c8ff",
-      plate: "#f7f2d3",
-      type: "hatchback",
-      spriteIndex: 7,
-    },
-  ];
-  const palette = carDesigns.map((design) => design.body);
-  const carSpriteSheet = new Image();
-  let carSpriteSheetReady = false;
-  carSpriteSheet.onload = () => {
-    carSpriteSheetReady = true;
+  const vehicleAssets = window.CarGameVehicleAssets || {
+    playerDesignId: "fallback-sedan",
+    aliases: {},
+    designs: [{ id: "fallback-sedan", body: "#d8dee2", type: "sedan" }],
   };
-  carSpriteSheet.src = "assets/cars/topview-korean-cars-transparent.png";
+  const carDesigns = vehicleAssets.designs;
+  const carDesignAliases = vehicleAssets.aliases || {};
+  const playerDesignId = vehicleAssets.playerDesignId || carDesigns[0].id;
+  const palette = carDesigns.map((design) => design.body);
+  for (const design of carDesigns) {
+    design.body = design.body || "#d8dee2";
+    design.roof = design.roof || shadeColor(design.body, -35);
+    design.glass = design.glass || "#172229";
+    design.trim = design.trim || "#eef2ef";
+    design.accent = design.accent || "#d43d3d";
+    design.plate = design.plate || "#f7f2d3";
+    design.type = design.type || "sedan";
+    design.image = new Image();
+    if (design.src) design.image.src = design.src;
+  }
 
-  const defaultLevels = buildLevels();
-  const levels = loadSavedLevels(defaultLevels);
+  const builtInLevels = buildLevels();
+  const defaultLevels = Array.isArray(window.CarGameLevels)
+    ? normalizeLevels(window.CarGameLevels, builtInLevels)
+    : builtInLevels;
+  const publishedLevels = await loadPublishedLevels(defaultLevels);
+  const levels = isAdmin ? loadSavedLevels(publishedLevels) : cloneLevels(publishedLevels);
   const input = {
     up: false,
     down: false,
@@ -162,6 +108,7 @@
   let viewport = { scale: 1, offsetX: 0, offsetY: 0, width: WORLD.w, height: WORLD.h };
   const editor = {
     enabled: false,
+    panelOpen: true,
     hover: null,
     selection: null,
     drag: null,
@@ -179,6 +126,7 @@
         spawn: { x: 142, y: 612, angle: Math.PI / 2 },
         target: topRow[4],
         slots: [...topRow, ...bottomRow],
+        designs: makeDesigns(0),
         obstacles: [
           ...parkedFromSlots([topRow[0], topRow[1], topRow[3], topRow[5], bottomRow[0], bottomRow[2], bottomRow[4]], 0),
           curb(404, 380, 240, 34),
@@ -192,6 +140,7 @@
         spawn: { x: 1084, y: 430, angle: -Math.PI / 2 },
         target: bottomRow[1],
         slots: [...topRow, ...bottomRow],
+        designs: makeDesigns(1),
         obstacles: [
           ...parkedFromSlots([topRow[0], topRow[2], topRow[3], topRow[5], bottomRow[0], bottomRow[2], bottomRow[3], bottomRow[5]], 1),
           curb(618, 365, 350, 34),
@@ -207,6 +156,7 @@
         spawn: { x: 136, y: 124, angle: Math.PI / 2 },
         target: rightColumn[2],
         slots: [...leftColumn, ...rightColumn, ...topRow.slice(1, 5), ...bottomRow.slice(1, 5)],
+        designs: makeDesigns(2),
         obstacles: [
           ...parkedFromSlots([leftColumn[0], leftColumn[1], leftColumn[3], rightColumn[0], rightColumn[1], rightColumn[3]], 2),
           ...parkedFromSlots([topRow[1], topRow[3], bottomRow[2], bottomRow[3]], 3),
@@ -227,6 +177,7 @@
           ...bottomRow,
           ...makeSlots({ x: 600, y: 384, count: 4, spacing: 116, angle: -Math.PI / 2, stepAngle: 0 }),
         ],
+        designs: makeDesigns(3),
         obstacles: [
           ...parkedFromSlots([topRow[0], topRow[1], topRow[3], topRow[4], topRow[5], bottomRow[0], bottomRow[2], bottomRow[4], bottomRow[5]], 4),
           ...parkedFromSlots(makeSlots({ x: 600, y: 384, count: 3, spacing: 116, angle: -Math.PI / 2, stepAngle: 0 }), 5),
@@ -246,24 +197,43 @@
     return JSON.parse(JSON.stringify(source));
   }
 
-  function loadSavedLevels(fallback) {
+  async function loadPublishedLevels(fallback) {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return cloneLevels(fallback);
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length !== fallback.length) return cloneLevels(fallback);
-      return parsed.map((savedLevel, index) => normalizeLevel(savedLevel, fallback[index]));
+      if (Array.isArray(window.CarGameLevels)) return cloneLevels(fallback);
+      if (location.protocol === "file:") return cloneLevels(fallback);
+      const response = await fetch(LEVELS_URL, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Cannot load ${LEVELS_URL}`);
+      const parsed = await response.json();
+      return normalizeLevels(parsed, fallback);
     } catch {
       return cloneLevels(fallback);
     }
   }
 
+  function loadSavedLevels(fallback) {
+    if (!isAdmin) return cloneLevels(fallback);
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return cloneLevels(fallback);
+      const parsed = JSON.parse(saved);
+      return normalizeLevels(parsed, fallback);
+    } catch {
+      return cloneLevels(fallback);
+    }
+  }
+
+  function normalizeLevels(source, fallback) {
+    if (!Array.isArray(source) || source.length !== fallback.length) return cloneLevels(fallback);
+    return source.map((sourceLevel, index) => normalizeLevel(sourceLevel, fallback[index]));
+  }
+
   function normalizeLevel(savedLevel, fallbackLevel) {
     return {
-      name: fallbackLevel.name,
+      name: typeof savedLevel?.name === "string" ? savedLevel.name : fallbackLevel.name,
       spawn: normalizeRect(savedLevel?.spawn, fallbackLevel.spawn),
       target: normalizeRect(savedLevel?.target, fallbackLevel.target),
       slots: normalizeArray(savedLevel?.slots, fallbackLevel.slots),
+      designs: normalizeDesignArray(savedLevel?.designs, fallbackLevel.designs || []),
       obstacles: normalizeArray(savedLevel?.obstacles, fallbackLevel.obstacles),
     };
   }
@@ -273,6 +243,23 @@
     return savedItems
       .filter((item) => item && Number.isFinite(item.x) && Number.isFinite(item.y))
       .map((item, index) => normalizeRect(item, fallbackItems[index] ?? item));
+  }
+
+  function normalizeDesignArray(savedItems, fallbackItems) {
+    if (!Array.isArray(savedItems)) return cloneLevels(fallbackItems);
+    return savedItems
+      .filter((item) => item && Number.isFinite(item.x) && Number.isFinite(item.y))
+      .map((item, index) => {
+        const fallback = fallbackItems.find((fallbackItem) => fallbackItem.id === item.id) ?? fallbackItems[index] ?? item;
+        const normalized = normalizeRect(item, fallback);
+        return {
+          ...normalized,
+          id: fallback.id || normalized.id,
+          type: fallback.type || normalized.type,
+          label: fallback.label || normalized.label,
+          phase: Number.isFinite(normalized.phase) ? normalized.phase : fallback.phase,
+        };
+      });
   }
 
   function normalizeRect(item, fallback) {
@@ -308,6 +295,54 @@
       color: palette[(index + offset) % palette.length],
       design: carDesigns[(index + offset) % carDesigns.length].id,
     }));
+  }
+
+  function makeDesigns(levelIndex) {
+    const rightArrowX = levelIndex === 2 ? 982 : 1050;
+    return [
+      {
+        id: "lane",
+        type: "lane",
+        label: "중앙선",
+        x: 640,
+        y: 380,
+        w: 972,
+        h: 44,
+        angle: 0,
+      },
+      {
+        id: "entry-arrow",
+        type: "arrow",
+        label: "진입 화살표",
+        x: 282,
+        y: 384,
+        w: 90,
+        h: 60,
+        angle: Math.PI / 2,
+        phase: 0,
+      },
+      {
+        id: "exit-arrow",
+        type: "arrow",
+        label: "출구 화살표",
+        x: rightArrowX,
+        y: 384,
+        w: 90,
+        h: 60,
+        angle: -Math.PI / 2,
+        phase: 1,
+      },
+      {
+        id: "crosswalk",
+        type: "crosswalk",
+        label: "횡단보도",
+        x: 140,
+        y: 545,
+        w: 108,
+        h: 82,
+        angle: 0,
+      },
+    ];
   }
 
   function cone(x, y) {
@@ -364,7 +399,7 @@
   }
 
   function syncEditorPanel() {
-    if (!editorLevelSelect) return;
+    if (!hasEditor) return;
     editorLevelSelect.value = String(activeLevel);
     editorStatus.textContent = editor.selection
       ? `${editor.selection.label} · x ${Math.round(editor.selection.object.x)} · y ${Math.round(editor.selection.object.y)}`
@@ -395,11 +430,11 @@
   }
 
   function setEditorMode(value) {
+    if (!hasEditor) return;
     editor.enabled = value;
     editor.hover = null;
     editor.selection = null;
     editor.drag = null;
-    editorPanel.classList.toggle("is-hidden", !editor.enabled);
     editButton.classList.toggle("is-active", editor.enabled);
     if (editor.enabled) {
       clearInput();
@@ -409,7 +444,32 @@
       car.speed = 0;
       hideBanner();
     }
+    syncEditorPanelVisibility();
     syncEditorPanel();
+  }
+
+  function setEditorPanelOpen(value) {
+    if (!hasEditor) return;
+    editor.panelOpen = value;
+    syncEditorPanelVisibility();
+  }
+
+  function toggleEditorPanel() {
+    if (!hasEditor) return;
+    if (!editor.enabled) {
+      editor.panelOpen = true;
+      setEditorMode(true);
+      return;
+    }
+    setEditorPanelOpen(!editor.panelOpen);
+  }
+
+  function syncEditorPanelVisibility() {
+    if (!hasEditor) return;
+    const visible = editor.enabled && editor.panelOpen;
+    editorPanel.classList.toggle("is-hidden", !visible);
+    panelToggleButton?.classList.toggle("is-active", visible);
+    panelToggleButton?.setAttribute("aria-expanded", String(visible));
   }
 
   function clearInput() {
@@ -417,8 +477,10 @@
   }
 
   function saveLayouts() {
+    if (!hasEditor) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(levels));
+      updateExportPreview();
       showBanner("저장됨", `레벨 ${activeLevel + 1} 배치`);
     } catch {
       showBanner("저장 실패", "브라우저 저장소 확인");
@@ -428,8 +490,32 @@
     }, 900);
   }
 
+  function exportLayouts() {
+    if (!hasEditor) return;
+    const json = updateExportPreview();
+    if (layoutExport) {
+      layoutExport.focus();
+      layoutExport.select();
+    }
+    const clipboardWrite = navigator.clipboard?.writeText(json);
+    if (!clipboardWrite) {
+      showBanner("JSON 준비됨", "아래 내용을 levels.json으로 전달");
+      return;
+    }
+    clipboardWrite
+      .then(() => showBanner("JSON 복사됨", "data/levels.json에 반영"))
+      .catch(() => showBanner("JSON 준비됨", "아래 내용을 levels.json으로 전달"));
+  }
+
+  function updateExportPreview() {
+    const json = `${JSON.stringify(levels, null, 2)}\n`;
+    if (layoutExport) layoutExport.value = json;
+    return json;
+  }
+
   function resetCurrentLayout() {
-    levels[activeLevel] = cloneLevels([defaultLevels[activeLevel]])[0];
+    if (!hasEditor) return;
+    levels[activeLevel] = cloneLevels([publishedLevels[activeLevel]])[0];
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(levels));
     } catch {
@@ -437,6 +523,7 @@
     }
     loadLevel(activeLevel);
     setEditorMode(true);
+    updateExportPreview();
     showBanner("기본값", `레벨 ${activeLevel + 1} 복원`);
     setTimeout(hideBanner, 900);
   }
@@ -676,18 +763,42 @@
     ctx.stroke();
     ctx.lineWidth = 4;
     ctx.strokeStyle = "#f2ce52";
-    ctx.setLineDash([28, 18]);
-    ctx.beginPath();
-    ctx.moveTo(154, 380);
-    ctx.lineTo(1126, 380);
-    ctx.stroke();
-    ctx.setLineDash([]);
     ctx.restore();
 
-    const rightArrowX = activeLevel === 2 ? 982 : 1050;
-    drawArrow(282, 384, Math.PI / 2, now);
-    drawArrow(rightArrowX, 384, -Math.PI / 2, now + 1);
-    drawCrosswalk(90, 504);
+    drawDesignElements(now);
+  }
+
+  function drawDesignElements(now) {
+    for (const design of level.designs || []) {
+      drawDesignElement(design, now);
+    }
+  }
+
+  function drawDesignElement(design, now) {
+    ctx.save();
+    ctx.translate(design.x, design.y);
+    ctx.rotate(design.angle || 0);
+
+    if (design.type === "lane") {
+      ctx.strokeStyle = "#f2ce52";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([28, 18]);
+      ctx.beginPath();
+      ctx.moveTo(-design.w / 2, 0);
+      ctx.lineTo(design.w / 2, 0);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (design.type === "arrow") {
+      drawArrowShape(now + (design.phase || 0));
+    }
+
+    if (design.type === "crosswalk") {
+      drawCrosswalkShape(design.w, design.h);
+    }
+
+    ctx.restore();
   }
 
   function drawSlots(now) {
@@ -786,7 +897,7 @@
     const bodyColor = damaged ? "#ff6b57" : color || spec.body;
     const type = spec.type;
 
-    if (carSpriteSheetReady) {
+    if (spec.image?.complete && spec.image.naturalWidth > 0) {
       drawVehiclePngSprite(w, h, spec, player, damaged);
       return;
     }
@@ -814,33 +925,19 @@
   }
 
   function drawVehiclePngSprite(w, h, spec, player, damaged) {
-    const cols = 4;
-    const cellW = carSpriteSheet.naturalWidth / cols;
-    const cellH = carSpriteSheet.naturalHeight / 2;
-    const index = spec.spriteIndex ?? 0;
-    const col = index % cols;
-    const row = Math.floor(index / cols);
-    const crop = {
-      x: col * cellW + cellW * 0.23,
-      y: row * cellH + cellH * 0.07,
-      w: cellW * 0.54,
-      h: cellH * 0.86,
-    };
-    const drawW = w * (player ? 1.48 : 1.54);
-    const drawH = h * (player ? 1.28 : 1.25);
+    const image = spec.image;
+    const crop = spec.crop || { x: 0, y: 0, w: image.naturalWidth, h: image.naturalHeight };
+    const heightScale = player ? 1.2 : 1.14;
+    const naturalRatio = crop.w / crop.h;
+    const drawH = h * heightScale;
+    const minW = w * (spec.minWidthScale || 1.08);
+    const maxW = w * (player ? 1.42 : 1.34);
+    const drawW = clamp(Math.max(minW, drawH * naturalRatio), minW, maxW);
 
     ctx.save();
-    ctx.drawImage(
-      carSpriteSheet,
-      crop.x,
-      crop.y,
-      crop.w,
-      crop.h,
-      -drawW / 2,
-      -drawH / 2,
-      drawW,
-      drawH,
-    );
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(image, crop.x, crop.y, crop.w, crop.h, -drawW / 2, -drawH / 2, drawW, drawH);
 
     if (damaged) {
       ctx.globalCompositeOperation = "source-atop";
@@ -851,7 +948,8 @@
   }
 
   function resolveCarDesign(id, color) {
-    const byId = carDesigns.find((design) => design.id === id);
+    const normalizedId = carDesignAliases[id] || id;
+    const byId = carDesigns.find((design) => design.id === normalizedId);
     const byColor = carDesigns.find((design) => design.body === color);
     return byId || byColor || carDesigns[0];
   }
@@ -1063,8 +1161,8 @@
     drawVehicleSprite({
       w: PLAYER.w,
       h: PLAYER.h,
-      design: "taxi-yellow",
-      color: car.flash > 0 ? "#ff6b57" : "#ffd65a",
+      design: playerDesignId,
+      color: car.flash > 0 ? "#ff6b57" : undefined,
       player: true,
       damaged: car.flash > 0,
     });
@@ -1097,6 +1195,7 @@
     for (const item of editorItems()) {
       if (item.kind === "slot") drawEditorOutline(item.object, "rgba(90, 176, 255, 0.24)", 2);
       if (item.kind === "obstacle") drawEditorOutline(item.object, "rgba(255, 214, 90, 0.38)", 2);
+      if (item.kind === "design") drawEditorOutline(editorItemRect(item), "rgba(246, 247, 241, 0.3)", 2);
     }
 
     drawEditorOutline(level.target, "rgba(80, 209, 138, 0.95)", 4);
@@ -1130,10 +1229,7 @@
     ctx.fill();
   }
 
-  function drawArrow(x, y, angle, now) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
+  function drawArrowShape(now) {
     ctx.globalAlpha = 0.42 + Math.sin(now * 2) * 0.04;
     ctx.fillStyle = "#f7f1d1";
     ctx.beginPath();
@@ -1146,17 +1242,13 @@
     ctx.lineTo(-14, 24);
     ctx.closePath();
     ctx.fill();
-    ctx.restore();
   }
 
-  function drawCrosswalk(x, y) {
-    ctx.save();
-    ctx.translate(x, y);
+  function drawCrosswalkShape(w, h) {
     ctx.fillStyle = "rgba(246, 247, 241, 0.44)";
     for (let i = 0; i < 6; i += 1) {
-      ctx.fillRect(i * 18, 0, 9, 82);
+      ctx.fillRect(-w / 2 + i * 18, -h / 2, 9, h);
     }
-    ctx.restore();
   }
 
   function sameSlot(a, b) {
@@ -1209,6 +1301,16 @@
       });
     });
 
+    (level.designs || []).forEach((object, index) => {
+      items.push({
+        kind: "design",
+        label: designLabel(object, index),
+        object,
+        index,
+        rect: object,
+      });
+    });
+
     level.slots.forEach((object, index) => {
       items.push({
         kind: "slot",
@@ -1222,6 +1324,10 @@
     return items;
   }
 
+  function designLabel(object, index) {
+    return object.label || `디자인 ${index + 1}`;
+  }
+
   function obstacleLabel(object, index) {
     if (object.type === "parked") return `주차차 ${index + 1}`;
     if (object.type === "cone") return `콘 ${index + 1}`;
@@ -1231,7 +1337,7 @@
 
   function pickEditorItem(point) {
     const items = editorItems();
-    const priority = ["target", "spawn", "obstacle", "slot"];
+    const priority = ["target", "spawn", "obstacle", "slot", "design"];
     for (const kind of priority) {
       for (let index = items.length - 1; index >= 0; index -= 1) {
         const item = items[index];
@@ -1377,6 +1483,7 @@
   }
 
   function initEditorPanel() {
+    if (!hasEditor) return;
     editorLevelSelect.replaceChildren(
       ...levels.map((levelData, index) => {
         const option = document.createElement("option");
@@ -1402,7 +1509,7 @@
 
   window.addEventListener("keydown", (event) => {
     const lowered = event.key.toLowerCase();
-    if (lowered === "e") {
+    if (hasEditor && lowered === "e") {
       setEditorMode(!editor.enabled);
       event.preventDefault();
       return;
@@ -1456,20 +1563,24 @@
 
   pauseButton.addEventListener("click", () => setPaused(!paused));
   resetButton.addEventListener("click", () => loadLevel(activeLevel));
-  editButton.addEventListener("click", () => setEditorMode(!editor.enabled));
-  editorLevelSelect.addEventListener("change", () => loadLevel(Number(editorLevelSelect.value)));
-  saveLayoutButton.addEventListener("click", saveLayouts);
-  resetLayoutButton.addEventListener("click", resetCurrentLayout);
-  addParkedButton.addEventListener("click", () => addObstacle("parked"));
-  addConeButton.addEventListener("click", () => addObstacle("cone"));
-  addCurbButton.addEventListener("click", () => addObstacle("curb"));
-  deleteItemButton.addEventListener("click", deleteSelected);
-  rotateLeftButton.addEventListener("click", () => rotateSelected(-Math.PI / 12));
-  rotateRightButton.addEventListener("click", () => rotateSelected(Math.PI / 12));
-  canvas.addEventListener("pointerdown", handleEditorPointerDown);
-  canvas.addEventListener("pointermove", handleEditorPointerMove);
-  canvas.addEventListener("pointerup", handleEditorPointerUp);
-  canvas.addEventListener("pointercancel", handleEditorPointerUp);
+  if (hasEditor) {
+    editButton.addEventListener("click", () => setEditorMode(!editor.enabled));
+    panelToggleButton?.addEventListener("click", toggleEditorPanel);
+    editorLevelSelect.addEventListener("change", () => loadLevel(Number(editorLevelSelect.value)));
+    saveLayoutButton.addEventListener("click", saveLayouts);
+    resetLayoutButton.addEventListener("click", resetCurrentLayout);
+    exportLayoutButton?.addEventListener("click", exportLayouts);
+    addParkedButton.addEventListener("click", () => addObstacle("parked"));
+    addConeButton.addEventListener("click", () => addObstacle("cone"));
+    addCurbButton.addEventListener("click", () => addObstacle("curb"));
+    deleteItemButton.addEventListener("click", deleteSelected);
+    rotateLeftButton.addEventListener("click", () => rotateSelected(-Math.PI / 12));
+    rotateRightButton.addEventListener("click", () => rotateSelected(Math.PI / 12));
+    canvas.addEventListener("pointerdown", handleEditorPointerDown);
+    canvas.addEventListener("pointermove", handleEditorPointerMove);
+    canvas.addEventListener("pointerup", handleEditorPointerUp);
+    canvas.addEventListener("pointercancel", handleEditorPointerUp);
+  }
   window.addEventListener("resize", resizeCanvas);
 
   function frame(now) {
@@ -1482,6 +1593,10 @@
 
   initEditorPanel();
   loadLevel(0);
+  if (hasEditor) {
+    setEditorMode(true);
+    updateExportPreview();
+  }
   resizeCanvas();
   requestAnimationFrame(frame);
 })();

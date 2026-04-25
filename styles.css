@@ -221,6 +221,10 @@ button {
   pointer-events: auto;
 }
 
+body[data-mode="admin"] .editor-panel {
+  width: min(560px, calc(100% - 28px));
+}
+
 .editor-panel.is-hidden {
   display: none;
 }
@@ -262,6 +266,24 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.layout-export {
+  width: 100%;
+  min-height: 92px;
+  max-height: 170px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  color: var(--ink);
+  padding: 9px 10px;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  outline: none;
+}
+
+.layout-export:focus {
+  border-color: rgba(90, 176, 255, 0.78);
 }
 
 .touch-pad {

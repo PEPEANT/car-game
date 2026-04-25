@@ -1,10 +1,21 @@
-const CACHE_NAME = "car-game-v4";
+const CACHE_NAME = "car-game-v11";
 const ASSETS = [
   "./",
   "./index.html",
+  "./admin.html",
   "./styles.css",
-  "./game.js",
-  "./assets/cars/topview-korean-cars-transparent.png",
+  "./data/levels.json",
+  "./js/vehicle-assets.js?v=11",
+  "./js/levels-data.js?v=11",
+  "./game.js?v=11",
+  "./assets/cars/individual/01-white-minivan.png",
+  "./assets/cars/individual/02-pale-blue-compact.png",
+  "./assets/cars/individual/03-silver-sedan.png",
+  "./assets/cars/individual/04-charcoal-suv.png",
+  "./assets/cars/individual/05-navy-wagon.png",
+  "./assets/cars/individual/06-red-sedan.png",
+  "./assets/cars/individual/07-white-van.png",
+  "./assets/cars/individual/08-olive-pickup.png",
   "./favicon.svg",
   "./manifest.webmanifest",
 ];

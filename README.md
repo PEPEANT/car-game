@@ -10,13 +10,15 @@ Open `index.html` in a browser.
 - Brake: Space
 - Reset level: R
 - Pause: P
-- Edit layout: E or the pencil button
 
 ## Editor
 
-The in-game editor lets you adjust each level directly:
+Open `admin.html` to edit maps. The public play page does not show editor controls.
 
 - Drag parking slots, obstacles, spawn points, and targets
+- Drag map design elements such as lane lines, arrows, and crosswalks
 - Add parked cars, cones, and curbs
 - Rotate or delete selected items
-- Save layouts to browser local storage
+- Toggle the admin panel with the panel button
+- Use `임시저장` to keep a browser-local draft
+- Use `JSON 내보내기` and apply the result to `data/levels.json` before committing
