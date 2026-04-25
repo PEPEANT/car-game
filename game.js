@@ -826,9 +826,8 @@
       w: cellW * 0.54,
       h: cellH * 0.86,
     };
-    const scale = player ? 1.22 : 1.18;
-    const drawW = w * scale;
-    const drawH = h * scale;
+    const drawW = w * (player ? 1.48 : 1.54);
+    const drawH = h * (player ? 1.28 : 1.25);
 
     ctx.save();
     ctx.drawImage(
